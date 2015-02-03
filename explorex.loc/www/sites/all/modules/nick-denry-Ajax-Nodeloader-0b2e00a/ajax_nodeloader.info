@@ -1,0 +1,8 @@
+name = Ajax Nodeloader
+description = Simple module for load nodes via ajax
+package = Other
+core = 7.x
+
+dependencies[] = path
+
+configure = admin/config/system/ajax_nodeloader

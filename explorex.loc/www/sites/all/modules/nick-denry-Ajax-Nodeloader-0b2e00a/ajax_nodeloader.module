@@ -1,0 +1,193 @@
+<?php
+
+/**
+ * @file
+ * Allow load node title and body field without reloading site pages
+ * via adding class "nodeloader" to your site links
+ */
+
+
+/**
+ *  Add js and css for module.
+ */
+function ajax_nodeloader_init() {
+  drupal_add_css(drupal_get_path('module', 'ajax_nodeloader') . '/css/ajax_nodeloader.css');
+  drupal_add_js(drupal_get_path('module', 'ajax_nodeloader') . '/js/ajax_nodeloader.js');
+
+  // Module options to Drupal.settings javascript.
+  // Google analytics tracking.
+  // AJAX loader image delay.
+  $options = array();
+  $options['ajax_loader_delay'] = variable_get('ajax_nodeloader_loader_image_delay', 0);
+  $options['display_title'] = variable_get('ajax_nodeloader_display_title', '#page-title');
+  $options['display_content'] = variable_get('ajax_nodeloader_display_content', 'div.node > div.content');
+  $options['set_title'] = variable_get('ajax_nodeloader_set_document_title') == 1 ? TRUE : FALSE;
+  $options['advanced_navigation'] = variable_get('ajax_nodeloader_use_advanced_navigation') == 1 ? TRUE : FALSE;
+  $options['use_google_tracking'] = variable_get('ajax_nodeloader_use_google_tracking') == 1 ? TRUE : FALSE;
+  $options['site']['front_page'] = '/' . variable_get('site_frontpage', 'node/1');
+  $options['site']['name'] = variable_get('site_name');
+
+  drupal_add_js(array('ajax_nodeloader' => $options), 'setting');
+}
+
+/**
+ * Implements ajax_nodeloader_admin().
+ */
+function ajax_nodeloader_admin() {
+  $form = array();
+
+  $form['ajax_nodeloader_loader_image_delay'] = array(
+    '#type' => 'textfield',
+    '#title' => t('AJAX loader image delay (milliseconds)'),
+    '#default_value' => variable_get('ajax_nodeloader_loader_image_delay', 0),
+    '#description' => t('Use delay to avoid loader image blink on fast connections.'),
+  );
+
+  $form['ajax_nodeloader_display_title'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Set default css selector where display your titles'),
+    '#default_value' => variable_get('ajax_nodeloader_display_title', '#page-title'),
+    '#description' => t("Default is '#page-title'. You still can override it via rel attribute for single link."),
+  );
+
+  $form['ajax_nodeloader_display_content'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Set default css selector where display your content'),
+    '#default_value' => variable_get('ajax_nodeloader_display_content', 'div.node > div.content'),
+    '#description' => t("Default is 'div.node > div.content'. You still can override it via rel attribute for single link."),
+  );
+
+  $form['ajax_nodeloader_use_advanced_navigation'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Use advanced navigation'),
+    '#default_value' => variable_get('ajax_nodeloader_use_advanced_navigation', 1),
+    '#description' => t('Use HTML 5 History API or hashtag (old browsers) advanced navigation with back and forward browser buttons and allow users share your AJAXified links'),
+  );
+
+  $form['ajax_nodeloader_set_document_title'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Dynamically set browser title'),
+    '#default_value' => variable_get('ajax_nodeloader_set_document_title', 0),
+    '#description' => t('Set browser window title using format "Node title | Sitename"'),
+  );
+
+  $form['ajax_nodeloader_use_google_tracking'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Track with Google Analytics'),
+    '#default_value' => variable_get('ajax_nodeloader_use_google_tracking', 1),
+    '#description' => t('Use Google Analytics for tracking ajax-loaded links (you must have Google Analytics code installed)'),
+  );
+
+  return system_settings_form($form);
+}
+
+/**
+ * Implements hook_menu().
+ */
+function ajax_nodeloader_menu() {
+  $items = array();
+
+  $items['ajax_nodeloader/%ajax_nodeloader_url'] = array(
+    'title' => 'load node via alias',
+    'page callback' => 'ajax_nodeloader_load_node',
+    'page arguments' => array(1),
+    'load arguments' => array('%map','%index'),
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['ajax_nodeloader/node/%ajax_nodeloader_url'] = array(
+    'title' => 'load node',
+    'page callback' => 'ajax_nodeloader_load_node',
+    'page arguments' => array(2),
+    'load arguments' => array('%map','%index'),
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+
+  // Module settings menu.
+  $items['admin/config/system/ajax_nodeloader'] = array(
+    'title' => 'Ajax Nodeloader',
+    'description' => 'Ajax Nodeloader behaviour configuration',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('ajax_nodeloader_admin'),
+    'access arguments' => array('administer ajax_nodeloader'),
+  );
+
+  return $items;
+}
+
+/**
+ * Use %wildcard_load to get dynamically separated parts imploded into one string.
+ *   @see http://drupal.org/node/109153
+ *   @see http://api.drupal.org/api/drupal/includes!menu.inc/function/menu_tail_to_arg/6
+ */
+function ajax_nodeloader_url_load($arg, $map, $index) {
+  return implode("/", array_slice($map, $index));
+}
+
+/**
+ * Implements of ajax_nodeloader_load_node().
+ *
+ * @nid
+ *   Numeric node id or path alias
+ */
+function ajax_nodeloader_load_node($encoded_url) {
+  /* init node loading */
+  $output = FALSE;
+  $delta = 0;
+
+  if (!is_numeric($encoded_url)) {
+    $system_path = drupal_lookup_path('source', $encoded_url);
+    $path = explode('/', $system_path);
+    $nid = $path[1];
+  }
+  else {
+    $nid = $encoded_url;
+  }
+
+
+  if ($nid != 0) {
+    $node = node_load($nid);
+  }
+
+  if ($node) {
+
+    // Check if user has "bypass node access" permission first.
+    // See http://api.drupal.org/api/drupal/modules!node!node.module/group/node_access/7
+    if (node_access('view', $node)) {
+      $node_info = array();
+
+      // Set node id.
+      $node_info['nid'] = $nid;
+
+      // Set node title.
+      $node_info['title'] = $node->title;
+
+      // Get other node fields (include body)
+      // Get all fields.
+      $node_fields = field_info_fields();
+
+      foreach ($node_fields as $node_field) {
+        // Get node field items.
+        $field_item = field_get_items('node', $node, $node_field['field_name'], $node->language);
+
+        // If item not emty add it to array.
+        if ($field_item !== FALSE) {
+          $node_info['fields'][$node_field['field_name']] = render(field_view_value('node', $node, $node_field['field_name'], $field_item[$delta]));
+        }
+      }
+
+      $output = $node_info;
+    }
+    else {
+      $output['fields']['body'] = t('Access denied');
+    }
+  }
+
+  $result = drupal_json_encode($output);
+  drupal_add_http_header('Content-Type', 'text/javascript; charset=utf-8');
+  echo $result;
+
+  return NULL;
+}

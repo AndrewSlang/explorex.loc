@@ -1,0 +1,10 @@
+#ajax-nodeloader-image {
+  background: url(../ajax-loader.gif) no-repeat top left;
+  display: none;
+  height: 32px;
+  left: 30px;
+  position: absolute;
+  top: 60px;
+  width: 32px;
+  z-index: 11;
+}

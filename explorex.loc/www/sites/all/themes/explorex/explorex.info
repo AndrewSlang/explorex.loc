@@ -1,0 +1,28 @@
+name = Explorex
+description = A description of Explorex theme
+core = 7.x
+
+regions[header] = Header
+regions[main_menu] = Main menu
+regions[secondary_menu] = Secondary menu
+#regions[btn_content] = Button 'Join Now' and 'Like (small)'
+#regions[social] = Floater
+regions[slider_large] = Large Slider
+regions[short_info] = Some information down slider
+regions[nav_content] = Navigation of content
+regions[content] = Content
+#regions[count] = Button counter 'Star' and 'Like (large)'
+regions[slider_small] = Small Slider
+regions[footer] = Footer of Explorex
+
+# Стили CSS
+stylesheets[all][] = css/style.css
+stylesheets[all][] = css/fonts.css
+ 
+# JavaScript
+scripts[] = js/jquery-1.11.2.min.js
+scripts[] = js/jquery.smoothZoom.min.js
+scripts[] = js/zoom.js
+scripts[] = js/jssor.js
+scripts[] = js/jssor.slider.js
+scripts[] = js/slider.js
